@@ -3,20 +3,23 @@
 // import 'package:flutter/services.dart';
 // import 'package:provider/provider.dart';
 // import 'package:http/http.dart' as http;
-// import 'package:url_launcher/url_launcher.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 // import '../config/config.dart';
 // import '../providers/provider.dart';
 
+// // === Constants ===
 // const kConstCity = 'Agra';
 // const kConstState = 'UP';
 // const kConstPincode = '282005';
 
+// // === UPI (replace with your merchant details) ===
 // const kMerchantVpa = 'paytmqr6jkklj@ptys';
 // const kMerchantName = 'FPS Store';
 
+// // === API base ===
 // const kApiBase = '${AppConfig.baseUrl}/me/orders/';
 
+// // ====== TOKEN (SharedPreferences-based) ======
 // Future<String?> _readAuthToken() async {
 //   final prefs = await SharedPreferences.getInstance();
 //   final token = prefs.getString('token');
@@ -103,13 +106,6 @@
 //                       title: 'Payment Method',
 //                       child: Column(
 //                         children: [
-//                           RadioListTile(
-//                             value: PaymentMethod.cod,
-//                             groupValue: _method,
-//                             onChanged: (v) => setState(() => _method = v!),
-//                             title: const Text('Cash on Delivery'),
-//                             subtitle: const Text('Pay when your order arrives'),
-//                           ),
 //                           RadioListTile(
 //                             value: PaymentMethod.online,
 //                             groupValue: _method,
@@ -240,17 +236,10 @@
 //     );
 //   }
 
+//   // UPI options WITHOUT any links or app launches (per new UPI risk policy)
 //   Widget _buildUpiOptions(BuildContext context) {
 //     final cart = context.read<CartProvider>();
 //     final amount = cart.total;
-
-//     final upiUrl = _buildUpiUrl(
-//       payeeVpa: kMerchantVpa,
-//       payeeName: kMerchantName,
-//       amount: amount,
-//       note: 'Order payment',
-//       tr: 'ref_${DateTime.now().millisecondsSinceEpoch}',
-//     );
 
 //     return Column(
 //       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -265,6 +254,8 @@
 //           onSelectionChanged: (s) => setState(() => _upiMode = s.first),
 //         ),
 //         const SizedBox(height: 12),
+
+//         // --- QR Mode ---
 //         if (_upiMode == UpiMode.qr) ...[
 //           Center(
 //             child: ClipRRect(
@@ -282,20 +273,25 @@
 //             'Scan with any UPI app to pay ₹${amount.toStringAsFixed(2)} to $kMerchantName',
 //             textAlign: TextAlign.center,
 //           ),
-//         ] else ...[
+//           const SizedBox(height: 8),
 //           const _LabeledRow(
-//             label: 'Pay to UPI ID',
+//             label: 'UPI ID',
 //             value: kMerchantVpa,
 //             copyable: true,
 //           ),
-//           const SizedBox(height: 8),
-//           FilledButton.icon(
-//             onPressed: () async {
-//               final uri = Uri.parse(upiUrl);
-//               await launchUrl(uri, mode: LaunchMode.externalApplication);
-//             },
-//             icon: const Icon(Icons.open_in_new),
-//             label: Text('Pay ₹${amount.toStringAsFixed(2)} via UPI'),
+//         ],
+
+//         // --- UPI ID Mode ---
+//         if (_upiMode == UpiMode.upiId) ...[
+//           const _LabeledRow(
+//             label: 'UPI ID',
+//             value: kMerchantVpa,
+//             copyable: true,
+//           ),
+//           const SizedBox(height: 6),
+//           Text(
+//             'Use any UPI app and pay to the UPI ID above. No in-app launch.',
+//             style: TextStyle(color: Colors.grey.shade700),
 //           ),
 //         ],
 //       ],
@@ -303,7 +299,7 @@
 //   }
 
 //   Future<void> _onMakePayment() async {
-//     // Manual sanity checks since there are no editable fields now
+//     // Manual sanity checks (no editable fields)
 //     if ((_name.trim().isEmpty) ||
 //         (_phone.trim().length < 10) ||
 //         (_addr1.trim().isEmpty)) {
@@ -331,7 +327,7 @@
 
 //     try {
 //       final payload = _buildOrderPayload(
-//         paymentMethod: _method == PaymentMethod.cod ? 'COD' : 'UPI',
+//         paymentMethod: _method == PaymentMethod.cod ? 'COD' : 'ONLINE',
 //         name: _name.trim(),
 //         phone: _phone.trim(),
 //         addr1: _addr1.trim(),
@@ -354,42 +350,25 @@
 //         return;
 //       }
 
-//       // UPI flow
+//       // === UPI (NO GATEWAY / NO LINKS / NO VERIFICATION) ===
+//       // 1) Create order first to get order id + amount.
 //       final createRes = await _createOrderAndGetId(payload);
 //       if (createRes == null) throw Exception('Failed to create UPI order.');
 //       final orderId = createRes.orderId;
 //       final amount = createRes.amount;
 
-//       final upiUrl = _buildUpiUrl(
-//         payeeVpa: kMerchantVpa,
-//         payeeName: kMerchantName,
-//         amount: amount,
-//         note: 'Order #$orderId',
-//         tr: 'order_$orderId',
+//       // 2) DO NOT open any UPI intent or show URLs.
+//       // 3) Immediately finish (manual verification by shopkeeper).
+//       if (!mounted) return;
+//       cart.clear();
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(
+//           content: Text(
+//             'Order #$orderId placed (UPI). Please pay ₹${amount.toStringAsFixed(2)} to $kMerchantVpa. We will verify payment on call.',
+//           ),
+//         ),
 //       );
-//       final upiResult = await _launchUpi(upiUrl);
-
-//       if (upiResult == null) {
-//         throw Exception('Payment cancelled or no response from UPI app.');
-//       }
-//       final status = upiResult['status']?.toString().toUpperCase() ?? 'FAILURE';
-//       final txnId = upiResult['txnId'] ?? upiResult['transactionId'] ?? '';
-
-//       if (status == 'SUCCESS') {
-//         final ok = await _confirmUpi(orderId, txnId.toString());
-//         if (!ok) debugPrint('WARN: Server could not verify UPI payment.');
-//         if (!mounted) return;
-//         cart.clear();
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('Payment successful. Order placed.')),
-//         );
-//         Navigator.pop(context);
-//       } else {
-//         if (!mounted) return;
-//         ScaffoldMessenger.of(
-//           context,
-//         ).showSnackBar(SnackBar(content: Text('Payment failed: $status')));
-//       }
+//       Navigator.pop(context);
 //     } catch (e) {
 //       if (!mounted) return;
 //       ScaffoldMessenger.of(
@@ -418,7 +397,7 @@
 //         .toList();
 
 //     return {
-//       'payment_method': paymentMethod, // 'COD' or 'ONLONE'
+//       'payment_method': paymentMethod, // 'COD' or 'UPI'
 //       'shipping_name': name,
 //       'shipping_phone': phone,
 //       'address_line1': addr1,
@@ -430,59 +409,7 @@
 //     };
 //   }
 
-//   String _buildUpiUrl({
-//     required String payeeVpa,
-//     required String payeeName,
-//     required double amount,
-//     required String note,
-//     required String tr,
-//   }) {
-//     final params = {
-//       'pa': payeeVpa,
-//       'pn': payeeName,
-//       'am': amount.toStringAsFixed(2),
-//       'tn': note,
-//       'cu': 'INR',
-//       'tr': tr,
-//     };
-//     final qp = params.entries
-//         .map(
-//           (e) =>
-//               '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
-//         )
-//         .join('&');
-//     return 'upi://pay?$qp';
-//   }
-
-//   Future<Map<String, String>?> _launchUpi(String upiUrl) async {
-//     final uri = Uri.parse(upiUrl);
-//     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-//     if (!ok) return null;
-
-//     if (!mounted) return null;
-//     final res = await showDialog<Map<String, String>>(
-//       context: context,
-//       builder: (_) => AlertDialog(
-//         title: const Text('UPI Payment'),
-//         content: const Text('Did the payment succeed in your UPI app?'),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(context, {'status': 'FAILURE'}),
-//             child: const Text('No'),
-//           ),
-//           TextButton(
-//             onPressed: () =>
-//                 Navigator.pop(context, {'status': 'SUCCESS', 'txnId': ''}),
-//             child: const Text('Yes'),
-//           ),
-//         ],
-//       ),
-//     );
-//     return res;
-//   }
-
 //   // ---------- Networking helpers ----------
-
 //   Future<Map<String, String>> _authJsonHeaders() async {
 //     final token = await _readAuthToken();
 //     if (token == null || token.isEmpty) {
@@ -575,28 +502,6 @@
 //       return null;
 //     }
 //   }
-
-//   Future<bool> _confirmUpi(int orderId, String txnId) async {
-//     try {
-//       final headers = await _authJsonHeaders();
-//       final confirmUri = Uri.parse(
-//         '${AppConfig.baseUrl}/me/orders/$orderId/confirm-upi/',
-//       );
-//       final res = await http.post(
-//         confirmUri,
-//         headers: headers,
-//         body: jsonEncode({'txn_id': txnId}),
-//       );
-//       if (res.statusCode != 200) {
-//         debugPrint('UPI confirm failed: ${res.statusCode} ${res.body}');
-//         return false;
-//       }
-//       return true;
-//     } catch (e) {
-//       debugPrint('UPI confirm error: $e');
-//       return false;
-//     }
-//   }
 // }
 
 // class _OrderCreateRes {
@@ -663,7 +568,6 @@
 //     );
 //   }
 // }
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -692,8 +596,6 @@ Future<String?> _readAuthToken() async {
   return (token != null && token.trim().isNotEmpty) ? token : null;
 }
 
-enum PaymentMethod { cod, online }
-
 enum UpiMode { qr, upiId }
 
 class CheckoutScreen extends StatefulWidget {
@@ -712,7 +614,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _addr1 = '';
   String _addr2 = '';
 
-  PaymentMethod _method = PaymentMethod.cod;
   UpiMode _upiMode = UpiMode.qr;
   bool _loading = false;
 
@@ -767,29 +668,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                     const SizedBox(height: 16),
 
-                    // ===== Payment Method =====
+                    // ===== Payment Method (Only Online / UPI) =====
                     _Section(
                       title: 'Payment Method',
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          RadioListTile(
-                            value: PaymentMethod.cod,
-                            groupValue: _method,
-                            onChanged: (v) => setState(() => _method = v!),
-                            title: const Text('Cash on Delivery'),
-                            subtitle: const Text('Pay when your order arrives'),
-                          ),
-                          RadioListTile(
-                            value: PaymentMethod.online,
-                            groupValue: _method,
-                            onChanged: (v) => setState(() => _method = v!),
-                            title: const Text('UPI'),
-                            subtitle: const Text(
-                              'Pay via UPI app (QR or UPI ID)',
+                          const ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              'UPI (Online Payment)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Pay via any UPI app using QR or UPI ID',
                             ),
                           ),
-                          if (_method == PaymentMethod.online)
-                            _buildUpiOptions(context),
+                          _buildUpiOptions(context),
                         ],
                       ),
                     ),
@@ -909,7 +806,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // UPI options WITHOUT any links or app launches (per new UPI risk policy)
+  // UPI options WITHOUT any links or app launches
   Widget _buildUpiOptions(BuildContext context) {
     final cart = context.read<CartProvider>();
     final amount = cart.total;
@@ -963,7 +860,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Use any UPI app and pay to the UPI ID above. No in-app launch.',
+            'Use any UPI app and pay to the UPI ID above.',
             style: TextStyle(color: Colors.grey.shade700),
           ),
         ],
@@ -999,8 +896,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _loading = true);
 
     try {
+      // 🔹 ALWAYS ONLINE PAYMENT NOW
       final payload = _buildOrderPayload(
-        paymentMethod: _method == PaymentMethod.cod ? 'COD' : 'ONLINE',
+        paymentMethod: 'ONLINE', // <- only online
         name: _name.trim(),
         phone: _phone.trim(),
         addr1: _addr1.trim(),
@@ -1011,33 +909,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         cart: cart,
       );
 
-      if (_method == PaymentMethod.cod) {
-        final ok = await _createOrder(payload);
-        if (!ok) throw Exception('Failed to place COD order.');
-        if (!mounted) return;
-        cart.clear();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Order placed (COD).')));
-        Navigator.pop(context);
-        return;
-      }
-
       // === UPI (NO GATEWAY / NO LINKS / NO VERIFICATION) ===
       // 1) Create order first to get order id + amount.
       final createRes = await _createOrderAndGetId(payload);
-      if (createRes == null) throw Exception('Failed to create UPI order.');
+      if (createRes == null) {
+        throw Exception('Failed to create online order.');
+      }
       final orderId = createRes.orderId;
       final amount = createRes.amount;
 
-      // 2) DO NOT open any UPI intent or show URLs.
-      // 3) Immediately finish (manual verification by shopkeeper).
+      // 2) No in-app UPI launch; customer pays manually using QR/UPI ID.
       if (!mounted) return;
       cart.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Order #$orderId placed (UPI). Please pay ₹${amount.toStringAsFixed(2)} to $kMerchantVpa. We will verify payment on call.',
+            'Order #$orderId placed. Please pay ₹${amount.toStringAsFixed(2)} to $kMerchantVpa via UPI. We will verify payment on call.',
           ),
         ),
       );
@@ -1070,7 +957,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         .toList();
 
     return {
-      'payment_method': paymentMethod, // 'COD' or 'UPI'
+      'payment_method': paymentMethod, // 'ONLINE'
       'shipping_name': name,
       'shipping_phone': phone,
       'address_line1': addr1,
@@ -1107,34 +994,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return null;
   }
 
-  Future<bool> _createOrder(Map<String, dynamic> payload) async {
-    try {
-      final headers = await _authJsonHeaders();
-      final res = await http.post(
-        Uri.parse(kApiBase),
-        headers: headers,
-        body: jsonEncode(payload),
-      );
-      if (res.statusCode == 200 || res.statusCode == 201) return true;
-
-      debugPrint('Create COD order failed: ${res.statusCode} ${res.body}');
-      final msg = _extractErrorMessage(res.body) ?? 'HTTP ${res.statusCode}';
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Create order failed: $msg')));
-      }
-      return false;
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Auth/Network error: $e')));
-      }
-      return false;
-    }
-  }
-
   Future<_OrderCreateRes?> _createOrderAndGetId(
     Map<String, dynamic> payload,
   ) async {
@@ -1146,13 +1005,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         body: jsonEncode(payload),
       );
       if (res.statusCode != 200 && res.statusCode != 201) {
-        debugPrint('Create UPI order failed: ${res.statusCode} ${res.body}');
+        debugPrint('Create online order failed: ${res.statusCode} ${res.body}');
         final msg = _extractErrorMessage(res.body);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Create UPI order failed: ${msg ?? res.statusCode}',
+                'Create order failed: ${msg ?? res.statusCode}',
               ),
             ),
           );
