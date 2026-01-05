@@ -83,6 +83,7 @@ flutter:
   assets:
      - assets/homepage.png
      - assets/fps_QR.jpeg
+     - assets/payment_qr.jpg
 
     
 

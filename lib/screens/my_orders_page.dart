@@ -795,7 +795,9 @@ class _OrderDetailDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isReady = order.isReady; // ✅ Only READY shows the banner
+    final isConfirmed = order.status.toUpperCase() == 'CONFIRMED';
+    final isPending = order.status.toUpperCase() == 'PENDING';
+    final isReady = order.isReady;
 
     return AlertDialog(
       backgroundColor: kBgBottom,
@@ -817,7 +819,6 @@ class _OrderDetailDialog extends StatelessWidget {
                   : order.status,
             ),
             const SizedBox(height: 6),
-            // Show readiness instruction in detail view as well (only when ready)
             if (isReady)
               Container(
                 width: double.infinity,
@@ -844,17 +845,51 @@ class _OrderDetailDialog extends StatelessWidget {
                   ],
                 ),
               ),
+              
+            if (isConfirmed)
+               Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                   border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                     SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Order Confirmed! Please pay to proceed.',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             _kv('Payment', order.paymentMethod),
             const SizedBox(height: 6),
-            _kv('Total', '₹ ${order.totalAmount.toStringAsFixed(2)}'),
+            if (isPending)
+               _kv('Total', 'TBD (Waiting for Admin)')
+            else
+               _kv('Total', '₹ ${order.totalAmount.toStringAsFixed(2)}'),
+            
             Divider(height: 16, color: kBorder),
+            
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Items',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  color: cs.primary, // palette via colorScheme
+                  color: cs.primary, 
                 ),
               ),
             ),
@@ -877,10 +912,15 @@ class _OrderDetailDialog extends StatelessWidget {
                       Text('x${it.qty}',
                           style: TextStyle(color: kTextPrimary)),
                       const SizedBox(width: 8),
-                      Text(
-                        '₹ ${it.lineTotal.toStringAsFixed(2)}',
-                        style: TextStyle(color: kTextPrimary),
-                      ),
+                      // Hide line item prices if pending, or show? 
+                      // Spec says "without seeing prices", so hide in pending.
+                      if (isPending) 
+                         Text('Price TBD', style: TextStyle(color: kTextPrimary, fontSize: 12))
+                      else
+                        Text(
+                          '₹ ${it.lineTotal.toStringAsFixed(2)}',
+                          style: TextStyle(color: kTextPrimary),
+                        ),
                     ],
                   );
                 },
@@ -888,6 +928,21 @@ class _OrderDetailDialog extends StatelessWidget {
                     Divider(height: 12, color: kBorder),
               ),
             ),
+            
+             if (isConfirmed) ...[
+               const SizedBox(height: 16),
+               SizedBox(
+                 width: double.infinity,
+                 child: FilledButton.icon(
+                   onPressed: () {
+                     Navigator.pop(context);
+                     _showPaymentInfo(context, order);
+                   },
+                   icon: const Icon(Icons.payment),
+                   label: const Text("Pay Now"),
+                 ),
+               )
+             ]
           ],
         ),
       ),
@@ -897,6 +952,49 @@ class _OrderDetailDialog extends StatelessWidget {
           child: Text('Close', style: TextStyle(color: kPrimary)),
         ),
       ],
+    );
+  }
+
+  void _showPaymentInfo(BuildContext context, MyOrder order) {
+     showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Make Payment", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Text("Total Amount: ₹ ${order.totalAmount.toStringAsFixed(2)}", style: const TextStyle(fontSize: 18)),
+              const SizedBox(height: 20),
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/payment_qr.jpg',
+                    width: 250,
+                    height: 250,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_,__,___) => const SizedBox(height: 250, child: Center(child: Text("QR Code not found"))),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text("Scan QR to pay", style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              SelectableText("UPI ID: yespay.rsbsdbconsumer1@yesbankltd", style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              Text("Bank: THE RADHASOAMI URBAN COOP BANK LTD.", style: TextStyle(color: Colors.grey[700], fontSize: 12), textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              const Text("After payment, the admin will verify and process your order.", textAlign: TextAlign.center,),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text("Done"))
+            ],
+          ),
+        ),
+      )
     );
   }
 

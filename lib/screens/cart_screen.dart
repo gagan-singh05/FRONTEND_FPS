@@ -65,7 +65,7 @@ class CartPage extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Total: ₹ ${cart.total.toStringAsFixed(2)}',
+                'Total: TBD', // Price confirmed by admin later
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,

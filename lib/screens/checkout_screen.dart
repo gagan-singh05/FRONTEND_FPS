@@ -101,25 +101,27 @@
 
 //                     const SizedBox(height: 16),
 
-//                     // ===== Payment Method =====
-//                     _Section(
-//                       title: 'Payment Method',
-//                       child: Column(
-//                         children: [
-//                           RadioListTile(
-//                             value: PaymentMethod.online,
-//                             groupValue: _method,
-//                             onChanged: (v) => setState(() => _method = v!),
-//                             title: const Text('UPI'),
-//                             subtitle: const Text(
-//                               'Pay via UPI app (QR or UPI ID)',
-//                             ),
-//                           ),
-//                           if (_method == PaymentMethod.online)
-//                             _buildUpiOptions(context),
-//                         ],
-//                       ),
-//                     ),
+//                     // ===== Payment Info Note =====
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Payment will be requested after admin confirmation.',
+                              style: TextStyle(color: Colors.blue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
 //                     const SizedBox(height: 16),
 
@@ -231,187 +233,6 @@
 //               ],
 //             ),
 //           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   // UPI options WITHOUT any links or app launches (per new UPI risk policy)
-//   Widget _buildUpiOptions(BuildContext context) {
-//     final cart = context.read<CartProvider>();
-//     final amount = cart.total;
-
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.stretch,
-//       children: [
-//         const SizedBox(height: 8),
-//         SegmentedButton<UpiMode>(
-//           segments: const [
-//             ButtonSegment(value: UpiMode.qr, label: Text('QR')),
-//             ButtonSegment(value: UpiMode.upiId, label: Text('UPI ID')),
-//           ],
-//           selected: <UpiMode>{_upiMode},
-//           onSelectionChanged: (s) => setState(() => _upiMode = s.first),
-//         ),
-//         const SizedBox(height: 12),
-
-//         // --- QR Mode ---
-//         if (_upiMode == UpiMode.qr) ...[
-//           Center(
-//             child: ClipRRect(
-//               borderRadius: BorderRadius.circular(12),
-//               child: Image.asset(
-//                 'assets/fps_QR.jpeg',
-//                 width: 220,
-//                 height: 220,
-//                 fit: BoxFit.cover,
-//               ),
-//             ),
-//           ),
-//           const SizedBox(height: 8),
-//           Text(
-//             'Scan with any UPI app to pay ₹${amount.toStringAsFixed(2)} to $kMerchantName',
-//             textAlign: TextAlign.center,
-//           ),
-//           const SizedBox(height: 8),
-//           const _LabeledRow(
-//             label: 'UPI ID',
-//             value: kMerchantVpa,
-//             copyable: true,
-//           ),
-//         ],
-
-//         // --- UPI ID Mode ---
-//         if (_upiMode == UpiMode.upiId) ...[
-//           const _LabeledRow(
-//             label: 'UPI ID',
-//             value: kMerchantVpa,
-//             copyable: true,
-//           ),
-//           const SizedBox(height: 6),
-//           Text(
-//             'Use any UPI app and pay to the UPI ID above. No in-app launch.',
-//             style: TextStyle(color: Colors.grey.shade700),
-//           ),
-//         ],
-//       ],
-//     );
-//   }
-
-//   Future<void> _onMakePayment() async {
-//     // Manual sanity checks (no editable fields)
-//     if ((_name.trim().isEmpty) ||
-//         (_phone.trim().length < 10) ||
-//         (_addr1.trim().isEmpty)) {
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(
-//           content: Text(
-//             'Missing profile details. Please add name/phone/address in your account.',
-//           ),
-//         ),
-//       );
-//       return;
-//     }
-
-//     final cart = context.read<CartProvider>();
-//     if (cart.lines.isEmpty) {
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(
-//         context,
-//       ).showSnackBar(const SnackBar(content: Text('Cart is empty')));
-//       return;
-//     }
-
-//     setState(() => _loading = true);
-
-//     try {
-//       final payload = _buildOrderPayload(
-//         paymentMethod: _method == PaymentMethod.cod ? 'COD' : 'ONLINE',
-//         name: _name.trim(),
-//         phone: _phone.trim(),
-//         addr1: _addr1.trim(),
-//         addr2: _addr2.trim(),
-//         city: kConstCity,
-//         state: kConstState,
-//         pincode: kConstPincode,
-//         cart: cart,
-//       );
-
-//       if (_method == PaymentMethod.cod) {
-//         final ok = await _createOrder(payload);
-//         if (!ok) throw Exception('Failed to place COD order.');
-//         if (!mounted) return;
-//         cart.clear();
-//         ScaffoldMessenger.of(
-//           context,
-//         ).showSnackBar(const SnackBar(content: Text('Order placed (COD).')));
-//         Navigator.pop(context);
-//         return;
-//       }
-
-//       // === UPI (NO GATEWAY / NO LINKS / NO VERIFICATION) ===
-//       // 1) Create order first to get order id + amount.
-//       final createRes = await _createOrderAndGetId(payload);
-//       if (createRes == null) throw Exception('Failed to create UPI order.');
-//       final orderId = createRes.orderId;
-//       final amount = createRes.amount;
-
-//       // 2) DO NOT open any UPI intent or show URLs.
-//       // 3) Immediately finish (manual verification by shopkeeper).
-//       if (!mounted) return;
-//       cart.clear();
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text(
-//             'Order #$orderId placed (UPI). Please pay ₹${amount.toStringAsFixed(2)} to $kMerchantVpa. We will verify payment on call.',
-//           ),
-//         ),
-//       );
-//       Navigator.pop(context);
-//     } catch (e) {
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(
-//         context,
-//       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-//     } finally {
-//       if (mounted) setState(() => _loading = false);
-//     }
-//   }
-
-//   // --- Helpers ---
-
-//   Map<String, dynamic> _buildOrderPayload({
-//     required String paymentMethod,
-//     required String name,
-//     required String phone,
-//     required String addr1,
-//     required String addr2,
-//     required String city,
-//     required String state,
-//     required String pincode,
-//     required CartProvider cart,
-//   }) {
-//     final items = cart.lines.values
-//         .map((l) => {'product_id': l.productId, 'quantity': l.qty})
-//         .toList();
-
-//     return {
-//       'payment_method': paymentMethod, // 'COD' or 'UPI'
-//       'shipping_name': name,
-//       'shipping_phone': phone,
-//       'address_line1': addr1,
-//       'address_line2': addr2,
-//       'city': city,
-//       'state': state,
-//       'pincode': pincode,
-//       'items': items,
-//     };
-//   }
-
-//   // ---------- Networking helpers ----------
-//   Future<Map<String, String>> _authJsonHeaders() async {
-//     final token = await _readAuthToken();
 //     if (token == null || token.isEmpty) {
 //       throw Exception('Not authenticated. Please log in again.');
 //     }
@@ -668,25 +489,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                     const SizedBox(height: 16),
 
-                    // ===== Payment Method (Only Online / UPI) =====
-                    _Section(
-                      title: 'Payment Method',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    // ===== Payment Info Note =====
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: const Row(
                         children: [
-                          const ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              'UPI (Online Payment)',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Pay via any UPI app using QR or UPI ID',
+                          Icon(Icons.info_outline, color: Colors.blue),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Payment will be requested after admin confirmation.',
+                              style: TextStyle(color: Colors.blue),
                             ),
                           ),
-                          _buildUpiOptions(context),
                         ],
                       ),
                     ),
@@ -705,20 +525,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               contentPadding: EdgeInsets.zero,
                               title: Text(l.title),
                               trailing: Text(
-                                'x${l.qty}  ₹${(l.price * l.qty).toStringAsFixed(2)}',
+                                'x${l.qty}',
                               ),
                             ),
                           const Divider(),
-                          Row(
+                          // Hide total price here too
+                          const Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Total',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               Text(
-                                '₹ ${cart.total.toStringAsFixed(2)}',
-                                style: const TextStyle(
+                                'TBD',
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -734,7 +555,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
-                        onPressed: _loading ? null : _onMakePayment,
+                        onPressed: _loading ? null : _onRequestOrder,
                         child: _loading
                             ? const SizedBox(
                                 height: 20,
@@ -743,7 +564,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('Place Your Order'),
+                            : const Text('Request Order'),
                       ),
                     ),
                   ],
@@ -806,69 +627,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // UPI options WITHOUT any links or app launches
-  Widget _buildUpiOptions(BuildContext context) {
-    final cart = context.read<CartProvider>();
-    final amount = cart.total;
+  // Payment options removed: Payment is post-confirmation.
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 8),
-        SegmentedButton<UpiMode>(
-          segments: const [
-            ButtonSegment(value: UpiMode.qr, label: Text('QR')),
-            ButtonSegment(value: UpiMode.upiId, label: Text('UPI ID')),
-          ],
-          selected: <UpiMode>{_upiMode},
-          onSelectionChanged: (s) => setState(() => _upiMode = s.first),
-        ),
-        const SizedBox(height: 12),
-
-        // --- QR Mode ---
-        if (_upiMode == UpiMode.qr) ...[
-          Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                'assets/fps_QR.jpeg',
-                width: 220,
-                height: 220,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Scan with any UPI app to pay ₹${amount.toStringAsFixed(2)} to $kMerchantName',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const _LabeledRow(
-            label: 'UPI ID',
-            value: kMerchantVpa,
-            copyable: true,
-          ),
-        ],
-
-        // --- UPI ID Mode ---
-        if (_upiMode == UpiMode.upiId) ...[
-          const _LabeledRow(
-            label: 'UPI ID',
-            value: kMerchantVpa,
-            copyable: true,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Use any UPI app and pay to the UPI ID above.',
-            style: TextStyle(color: Colors.grey.shade700),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Future<void> _onMakePayment() async {
+  Future<void> _onRequestOrder() async {
     // Manual sanity checks (no editable fields)
     if ((_name.trim().isEmpty) ||
         (_phone.trim().length < 10) ||
@@ -896,9 +657,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _loading = true);
 
     try {
-      // 🔹 ALWAYS ONLINE PAYMENT NOW
       final payload = _buildOrderPayload(
-        paymentMethod: 'ONLINE', // <- only online
+        paymentMethod: 'COD', // Default to COD/Request for now
         name: _name.trim(),
         phone: _phone.trim(),
         addr1: _addr1.trim(),
@@ -909,26 +669,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         cart: cart,
       );
 
-      // === UPI (NO GATEWAY / NO LINKS / NO VERIFICATION) ===
-      // 1) Create order first to get order id + amount.
-      final createRes = await _createOrderAndGetId(payload);
-      if (createRes == null) {
-        throw Exception('Failed to create online order.');
-      }
-      final orderId = createRes.orderId;
-      final amount = createRes.amount;
-
-      // 2) No in-app UPI launch; customer pays manually using QR/UPI ID.
+      final ok = await _createOrder(payload);
+      if (!ok) throw Exception('Failed to place order request.');
       if (!mounted) return;
-      cart.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Order #$orderId placed. Please pay ₹${amount.toStringAsFixed(2)} to $kMerchantVpa via UPI. We will verify payment on call.',
-          ),
-        ),
+      cart.clear(); // Clear cart after successful request
+      
+      await showDialog(
+        context: context, 
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Order Requested"),
+          content: const Text("Your order has been placed. Please wait for admin confirmation regarding price and availability."),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx); // Close dialog
+                Navigator.pop(context); // Close checkout
+              }, 
+              child: const Text("OK")
+            )
+          ],
+        )
       );
-      Navigator.pop(context);
+
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -992,6 +755,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<bool> _createOrder(Map<String, dynamic> payload) async {
+    try {
+      final headers = await _authJsonHeaders();
+      final res = await http.post(
+        Uri.parse(kApiBase),
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) return true;
+
+      debugPrint('Create order failed: ${res.statusCode} ${res.body}');
+      final msg = _extractErrorMessage(res.body) ?? 'HTTP ${res.statusCode}';
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Create order failed: $msg')));
+      }
+      return false;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Auth/Network error: $e')));
+      }
+      return false;
+    }
   }
 
   Future<_OrderCreateRes?> _createOrderAndGetId(

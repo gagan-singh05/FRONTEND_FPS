@@ -1315,10 +1315,20 @@ class _SignupScreenState extends State<SignupScreen> {
         Navigator.pop(context);
       } else {
         final body = jsonDecode(response.body);
-        final error = body['detail'] ?? 'Registration failed';
+        String errorMsg = 'Registration failed';
+        if (body is Map<String, dynamic>) {
+           if (body.containsKey('detail')) {
+             errorMsg = body['detail'];
+           } else {
+             // Combine all errors into one string
+             final errors = body.entries.map((e) => '${e.key}: ${e.value is List ? (e.value as List).join(", ") : e.value}').join('\n');
+             if (errors.isNotEmpty) errorMsg = errors;
+           }
+        }
+        
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(errorMsg)));
       }
     } catch (err) {
       setState(() => _isLoading = false);
