@@ -339,14 +339,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const MyApp()),
-      (route) => false,
-    );
+    await MyApp.logout(context);
   }
 
   Widget _buildReadOnlyField(

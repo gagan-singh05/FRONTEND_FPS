@@ -986,6 +986,7 @@ import 'package:http/http.dart' as http;
 
 import 'home_screen.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 import '../constants.dart'; // baseUrl
 import '../theme/palette.dart'; // colors
 import '../services/push_service.dart'; // <-- FCM device registration
@@ -1262,6 +1263,29 @@ class _LoginScreenState extends State<LoginScreen> {
               color: kPrimary,
               decoration: TextDecoration.underline,
               decorationColor: kPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Forgot Password link
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ForgotPasswordScreen(),
+              ),
+            );
+          },
+          child: Text(
+            "Forgot Password?",
+            style: TextStyle(
+              fontSize: 13,
+              color: kTextPrimary.withOpacity(0.7),
+              decoration: TextDecoration.underline,
             ),
             textAlign: TextAlign.center,
           ),

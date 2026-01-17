@@ -3974,9 +3974,9 @@ class _HomeContentState extends State<HomeContent>
 
   // ===== helpers =====
 
-  // Only show items with stock > 5
+  // Show products with stock > 2
   List<Product> get _visibleProducts =>
-      _products.where((p) => p.stock > 5).toList();
+      _products.where((p) => p.stock > 2).toList();
 
   // absolute URL if backend returns relative paths
   String? _imgUrl(Product p) {
@@ -4189,155 +4189,147 @@ class _HomeContentState extends State<HomeContent>
     final vn = _vnFor(p);
 
     return Card(
-      color: kCard, // palette card bg
+      color: kCard,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: const EdgeInsets.all(8),
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        width: 180,
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: img == null
-                    ? Container(
-                        color: kCard,
-                        child: Center(
-                          child: Icon(
-                            Icons.image,
-                            color: kTextPrimary,
-                            size: 44,
-                          ),
-                        ),
-                      )
-                    : Image.network(
-                        img,
-                        fit: BoxFit.cover,
-                        cacheWidth: 400,
-                        filterQuality: FilterQuality.low,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
+      child: Stack(
+        children: [
+          Container(
+            width: 180,
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Image
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: img == null
+                        ? Container(
                             color: kCard,
-                            child: const Center(
-                              child: SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                            child: Center(
+                              child: Icon(Icons.image, color: kTextPrimary, size: 44),
+                            ),
+                          )
+                        : Image.network(
+                            img,
+                            fit: BoxFit.cover,
+                            cacheWidth: 400,
+                            filterQuality: FilterQuality.low,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: kCard,
+                                child: const Center(
+                                  child: SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
                                 ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Container(
+                              color: kCard,
+                              child: Center(
+                                child: Icon(Icons.broken_image_outlined, color: kTextPrimary, size: 44),
                               ),
                             ),
-                          );
-                        },
-                        errorBuilder: (_, __, ___) => Container(
-                          color: kCard,
-                          child: Center(
-                            child: Icon(
-                              Icons.broken_image_outlined,
-                              color: kTextPrimary,
-                              size: 44,
-                            ),
                           ),
-                        ),
-                      ),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Name
-            SizedBox(
-              height: 36,
-              child: Text(
-                p.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: kTextPrimary,
+                  ),
                 ),
-              ),
+
+                const SizedBox(height: 10),
+
+                // Name
+                SizedBox(
+                  height: 36,
+                  child: Text(
+                    p.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: kTextPrimary),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // Price pill (tap = add to cart)
+                GestureDetector(
+                  onTap: p.stock > 0 ? () => _addToCart(p) : null,
+                  child: Container(
+                    height: 30,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: p.stock > 0 ? kPrimarySoft : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: p.stock > 0 ? _alpha(kPrimary, 0.35) : Colors.grey.shade300),
+                    ),
+                    child: Text(
+                      priceText,
+                      style: TextStyle(
+                        color: p.stock > 0 ? kPrimary : Colors.grey,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Quantity row (fast updates)
+                ValueListenableBuilder<int>(
+                  valueListenable: vn,
+                  builder: (_, q, __) {
+                    final canInc = (p.stock > 0) && (q < p.stock) && (q < _maxPerItem(p));
+                    return SizedBox(
+                      height: 34,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _qtyButton(
+                            icon: Icons.remove,
+                            onTap: q > 0 ? () => _dec(p) : null,
+                          ),
+                          Text(
+                            '$q',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary),
+                          ),
+                          _qtyButton(
+                            icon: Icons.add,
+                            onTap: canInc ? () => _inc(p) : null,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 8),
-
-            // Price pill (tap = add to cart)
-            GestureDetector(
-              onTap: () => _addToCart(p),
+          // STOCK BADGE
+          if (p.stock <= 5)
+            Positioned(
+              top: 8,
+              right: 8,
               child: Container(
-                height: 32,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: kPrimarySoft,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _alpha(kPrimary, 0.35)),
+                  color: p.stock == 0 ? Colors.red.withOpacity(0.9) : Colors.orange.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  priceText,
-                  style: TextStyle(
-                    color: kPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
+                  p.stock == 0 ? 'Out of Stock' : 'Low Stock: ${p.stock}',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-
-            const SizedBox(height: 10),
-
-            // Quantity row (fast updates)
-            ValueListenableBuilder<int>(
-              valueListenable: vn,
-              builder: (_, q, __) {
-                final canInc =
-                    (p.stock > 0) && (q < p.stock) && (q < _maxPerItem(p));
-                return SizedBox(
-                  height: 36,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _qtyButton(
-                        icon: Icons.remove,
-                        onTap: q > 0 ? () => _dec(p) : null,
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: kBgBottom,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: kBorder),
-                        ),
-                        child: Text(
-                          '$q',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: kTextPrimary,
-                          ),
-                        ),
-                      ),
-                      _qtyButton(
-                        icon: Icons.add,
-                        onTap: canInc ? () => _inc(p) : null,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

@@ -301,7 +301,7 @@ const _sage = AppPalette(
 
 /// ===== Manager =====
 
-class PaletteManager {
+class PaletteManager extends ValueNotifier<AppPalette> {
   static const _prefKey = 'palette_index_v1';
 
   static final List<AppPalette> _all = [
@@ -327,27 +327,41 @@ class PaletteManager {
     _sage,
   ];
 
-  static late AppPalette _current;
+  static late PaletteManager _instance;
+  static PaletteManager get instance => _instance;
+
+  PaletteManager(super.value);
 
   /// Call this once before runApp().
-  static Future<void> initRandom() async {
+  static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getInt(_prefKey);
+    AppPalette initial;
     if (saved != null && saved >= 0 && saved < _all.length) {
-      _current = _all[saved];
-      return;
+      initial = _all[saved];
+    } else {
+      final idx = Random().nextInt(_all.length);
+      await prefs.setInt(_prefKey, idx);
+      initial = _all[idx];
     }
-    final idx = Random().nextInt(_all.length);
-    await prefs.setInt(_prefKey, idx);
-    _current = _all[idx];
+    _instance = PaletteManager(initial);
+  }
+
+  static Future<void> setTheme(int index) async {
+    if (index < 0 || index >= _all.length) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_prefKey, index);
+    _instance.value = _all[index];
   }
 
   static int get index {
-    final i = _all.indexOf(_current);
+    final i = _all.indexOf(_instance.value);
     return i < 0 ? 0 : i;
   }
 
-  static AppPalette get current => _current;
+  static List<AppPalette> get all => _all;
+
+  static AppPalette get current => _instance.value;
 }
 
 /// ===== Public color getters (runtime-selected; not const) =====

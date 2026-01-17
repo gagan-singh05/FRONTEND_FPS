@@ -1,0 +1,24 @@
+Analyzing 2 items...                                            
+
+   info - The local variable '_toDouble' starts with an underscore - lib\screens\my_orders_page.dart:117:12 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_d' starts with an underscore - lib\screens\my_orders_page.dart:175:12 - no_leading_underscores_for_local_identifiers
+warning - The value of the field '_initialized' isn't used - lib\screens\my_orders_page.dart:227:8 - unused_field
+  error - Undefined name '_OrdersCache' - lib\screens\my_orders_page.dart:237:11 - undefined_identifier
+  error - Undefined name '_OrdersCache' - lib\screens\my_orders_page.dart:238:20 - undefined_identifier
+   info - Don't use 'BuildContext's across async gaps - lib\screens\my_orders_page.dart:351:9 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:646:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:674:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:684:42 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:810:61 - deprecated_member_use
+   info - Constructors for public widgets should have a named 'key' parameter - lib\screens\my_orders_page.dart:826:9 - use_key_in_widget_constructors
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:880:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:903:98 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\my_orders_page.dart:911:101 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:194:60 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:238:87 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:246:127 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:351:117 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:375:56 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:381:31 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\screens\order_detail_page.dart:381:59 - deprecated_member_use
+

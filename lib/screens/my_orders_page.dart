@@ -6,6 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/config.dart';
 import '../theme/palette.dart'; // ← palette
+import '../services/api_services.dart';
+import '../models/product.dart';
+import 'order_detail_page.dart';
 
 /// ====== CONFIG ======
 Uri get _ordersListUri =>
@@ -29,7 +32,7 @@ Future<Map<String, String>> _authJsonHeaders({
 }
 
 /// ====== LIGHTWEIGHT CACHING (SharedPreferences) ======
-class _OrdersCache {
+class OrdersCache {
   static const _kListBody = 'orders_list_body_v1';
   static const _kListEtag = 'orders_list_etag_v1';
   static const _kListAt = 'orders_list_at_v1';
@@ -58,6 +61,16 @@ class _OrdersCache {
 
   static String? get body => _memListBody;
   static String? get etag => _memEtag;
+
+  static Future<void> clearPagination() async {
+    _memListBody = null;
+    _memEtag = null;
+    _memAt = null;
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kListBody);
+    await p.remove(_kListEtag);
+    await p.remove(_kListAt);
+  }
 
   // Per-order detail cache
   static String _detailKey(int id) => 'order_detail_body_$id';
@@ -122,13 +135,19 @@ class MyOrder {
     );
   }
 
-  MyOrder copyWith({String? status, String? statusDisplay}) => MyOrder(
+  MyOrder copyWith({
+    String? status,
+    String? statusDisplay,
+    List<MyOrderLine>? items,
+    double? totalAmount,
+  }) =>
+      MyOrder(
         id: id,
         status: status ?? this.status,
         statusDisplay: statusDisplay ?? this.statusDisplay,
         paymentMethod: paymentMethod,
-        totalAmount: totalAmount,
-        items: items,
+        totalAmount: totalAmount ?? this.totalAmount,
+        items: items ?? this.items,
         createdAt: createdAt,
       );
 }
@@ -140,6 +159,7 @@ class MyOrderLine {
   final int qty;
   final double unitPrice;
   final double lineTotal;
+  final String? imageUrl;
 
   MyOrderLine({
     required this.id,
@@ -148,6 +168,7 @@ class MyOrderLine {
     required this.qty,
     required this.unitPrice,
     required this.lineTotal,
+    this.imageUrl,
   });
 
   factory MyOrderLine.fromJson(Map<String, dynamic> j) {
@@ -164,8 +185,19 @@ class MyOrderLine {
           : int.tryParse('${j['quantity']}') ?? 0,
       unitPrice: _d(j['unit_price']),
       lineTotal: _d(j['line_total']),
+      imageUrl: j['image_url'],
     );
   }
+
+  MyOrderLine copyWith({int? qty, double? lineTotal}) => MyOrderLine(
+        id: id,
+        productId: productId,
+        name: name,
+        qty: qty ?? this.qty,
+        unitPrice: unitPrice,
+        lineTotal: lineTotal ?? this.lineTotal,
+        imageUrl: imageUrl,
+      );
 }
 
 /// Off-main-isolate JSON parsing
@@ -202,8 +234,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
 
   Future<void> _bootstrap() async {
     // 1) Load cached list fast
-    await _OrdersCache.load();
-    final cached = _OrdersCache.body;
+    await OrdersCache.load();
+    final cached = OrdersCache.body;
     if (cached != null) {
       final parsed = await compute(_parseOrdersList, cached);
       if (mounted) {
@@ -218,7 +250,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     _initialized = true;
   }
 
-  Future<void> _fetchOrders({bool fromUser = true}) async {
+  Future<void> _fetchOrders({bool fromUser = true, bool force = false}) async {
     if (fromUser && mounted) {
       setState(() {
         _loading = _orders.isEmpty; // if we already have some, don't block UI
@@ -227,8 +259,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     }
     try {
       final extra = <String, String>{};
-      if (_OrdersCache.etag != null) {
-        extra['If-None-Match'] = _OrdersCache.etag!;
+      if (OrdersCache.etag != null && !force) {
+        extra['If-None-Match'] = OrdersCache.etag!;
       }
       final headers = await _authJsonHeaders(extra: extra);
       final res = await http
@@ -266,7 +298,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       }
 
       // Cache raw body + etag
-      await _OrdersCache.saveList(res.body, res.headers['etag']);
+      await OrdersCache.saveList(res.body, res.headers['etag']);
     } on TimeoutException {
       if (mounted) {
         setState(() {
@@ -284,7 +316,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     }
   }
 
-  Future<void> _refresh() => _fetchOrders(fromUser: true);
+  Future<void> _refresh() => _fetchOrders(fromUser: true, force: true);
 
   /// Show order quickly if we already have items (or cached detail).
   Future<void> _openOrder(int id) async {
@@ -302,9 +334,9 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       ),
     );
     if (local.items.isNotEmpty && local.status.isNotEmpty) {
-      await showDialog(
-        context: context,
-        builder: (_) => _OrderDetailDialog(order: local),
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OrderDetailPage(order: local)),
       );
       // Optionally refresh detail silently
       unawaited(_prefetchOrderDetail(id));
@@ -312,12 +344,12 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     }
 
     // 2) Try cached detail from prefs
-    final cachedBody = await _OrdersCache.loadDetailBody(id);
+    final cachedBody = await OrdersCache.loadDetailBody(id);
     if (cachedBody != null) {
       final cachedOrder = await compute(_parseOrderDetail, cachedBody);
-      await showDialog(
-        context: context,
-        builder: (_) => _OrderDetailDialog(order: cachedOrder),
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OrderDetailPage(order: cachedOrder)),
       );
       // Refresh silently
       unawaited(_prefetchOrderDetail(id));
@@ -334,7 +366,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         if (res.statusCode == 200) {
           final parsed = await compute(_parseOrderDetail, res.body);
           // cache detail
-          unawaited(_OrdersCache.saveDetail(id, res.body));
+          unawaited(OrdersCache.saveDetail(id, res.body));
           return parsed;
         } else {
           final msg = _extractErrorMessage(res.body) ??
@@ -357,10 +389,11 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     });
 
     if (!mounted || ord == null) return;
-    await showDialog(
-      context: context,
-      builder: (_) => _OrderDetailDialog(order: ord),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OrderDetailPage(order: ord)),
     );
+    _refresh();
   }
 
   Future<void> _prefetchOrderDetail(int id) async {
@@ -370,7 +403,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
           .get(_orderDetailUri(id), headers: headers)
           .timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
-        unawaited(_OrdersCache.saveDetail(id, res.body));
+        unawaited(OrdersCache.saveDetail(id, res.body));
       }
     } catch (_) {
       /* ignore */
@@ -788,225 +821,109 @@ class _OrderTile extends StatelessWidget {
   }
 }
 
-class _OrderDetailDialog extends StatelessWidget {
-  final MyOrder order;
-  const _OrderDetailDialog({required this.order});
+
+class ProductSearchDialog extends StatefulWidget {
+  const ProductSearchDialog();
+
+  @override
+  State<ProductSearchDialog> createState() => ProductSearchDialogState();
+}
+
+class ProductSearchDialogState extends State<ProductSearchDialog> {
+  final _ctrl = TextEditingController();
+  List<Product> _results = [];
+  bool _loading = false;
+  Timer? _debounce;
+
+  void _onSearch(String val) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      if (val.trim().isEmpty) {
+        setState(() => _results = []);
+        return;
+      }
+      setState(() => _loading = true);
+      try {
+        final list = await ApiService.getProducts(search: val.trim());
+        setState(() => _results = list.where((p) => p.stock > 2).toList());
+      } catch (_) {
+      } finally {
+        setState(() => _loading = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isConfirmed = order.status.toUpperCase() == 'CONFIRMED';
-    final isPending = order.status.toUpperCase() == 'PENDING';
-    final isReady = order.isReady;
-
     return AlertDialog(
       backgroundColor: kBgBottom,
-      title: Text(
-        'Order Details',
-        style: TextStyle(fontWeight: FontWeight.w800, color: kTextPrimary),
-      ),
+      title: const Text("Search Product"),
       content: SizedBox(
-        width: 420,
+        width: 400,
+        height: 480,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            _kv('Order #', '${order.id}'),
-            const SizedBox(height: 6),
-            _kv(
-              'Status',
-              order.statusDisplay.isNotEmpty
-                  ? order.statusDisplay
-                  : order.status,
-            ),
-            const SizedBox(height: 6),
-            if (isReady)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: kPrimarySoft,
-                  borderRadius: BorderRadius.circular(8),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              style: TextStyle(color: kTextPrimary),
+              onChanged: _onSearch,
+              decoration: InputDecoration(
+                hintText: "Enter product name...",
+                hintStyle: TextStyle(color: kTextPrimary.withOpacity(0.5)),
+                prefixIcon: Icon(Icons.search, color: kPrimary),
+                suffixIcon: _loading
+                    ? Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+                      )
+                    : null,
+                filled: true,
+                fillColor: kCard,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: kBorder),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: kPrimary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Your order is ready — collect it within 30 mins.',
-                        style: TextStyle(
-                          color: kTextPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: kBorder),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _results.isEmpty && !_loading
+                  ? Center(child: Text("No products found", style: TextStyle(color: kTextPrimary.withOpacity(0.6))))
+                  : ListView.separated(
+                      itemCount: _results.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: kBorder),
+                      itemBuilder: (_, i) {
+                        final p = _results[i];
+                        return ListTile(
+                          title: Text(p.name, style: TextStyle(color: kTextPrimary, fontWeight: FontWeight.w600)),
+                          subtitle: Text("Price: ₹${p.price}", style: TextStyle(color: kTextPrimary.withOpacity(0.7))),
+                          trailing: Icon(Icons.add_circle_outline, color: kPrimary),
+                          onTap: () => Navigator.pop(context, p),
+                        );
+                      },
                     ),
-                  ],
-                ),
-              ),
-              
-            if (isConfirmed)
-               Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                   border: Border.all(color: Colors.blue.shade100),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                     SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Order Confirmed! Please pay to proceed.',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            _kv('Payment', order.paymentMethod),
-            const SizedBox(height: 6),
-            if (isPending)
-               _kv('Total', 'TBD (Waiting for Admin)')
-            else
-               _kv('Total', '₹ ${order.totalAmount.toStringAsFixed(2)}'),
-            
-            Divider(height: 16, color: kBorder),
-            
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Items',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: cs.primary, 
-                ),
-              ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 220,
-              child: ListView.separated(
-                itemCount: order.items.length,
-                itemBuilder: (_, i) {
-                  final it = order.items[i];
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          it.name,
-                          style: TextStyle(color: kTextPrimary),
-                        ),
-                      ),
-                      Text('x${it.qty}',
-                          style: TextStyle(color: kTextPrimary)),
-                      const SizedBox(width: 8),
-                      // Hide line item prices if pending, or show? 
-                      // Spec says "without seeing prices", so hide in pending.
-                      if (isPending) 
-                         Text('Price TBD', style: TextStyle(color: kTextPrimary, fontSize: 12))
-                      else
-                        Text(
-                          '₹ ${it.lineTotal.toStringAsFixed(2)}',
-                          style: TextStyle(color: kTextPrimary),
-                        ),
-                    ],
-                  );
-                },
-                separatorBuilder: (_, __) =>
-                    Divider(height: 12, color: kBorder),
-              ),
-            ),
-            
-             if (isConfirmed) ...[
-               const SizedBox(height: 16),
-               SizedBox(
-                 width: double.infinity,
-                 child: FilledButton.icon(
-                   onPressed: () {
-                     Navigator.pop(context);
-                     _showPaymentInfo(context, order);
-                   },
-                   icon: const Icon(Icons.payment),
-                   label: const Text("Pay Now"),
-                 ),
-               )
-             ]
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Close', style: TextStyle(color: kPrimary)),
+          child: Text("Cancel", style: TextStyle(color: kPrimary)),
         ),
       ],
     );
   }
-
-  void _showPaymentInfo(BuildContext context, MyOrder order) {
-     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Make Payment", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              Text("Total Amount: ₹ ${order.totalAmount.toStringAsFixed(2)}", style: const TextStyle(fontSize: 18)),
-              const SizedBox(height: 20),
-              Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    'assets/payment_qr.jpg',
-                    width: 250,
-                    height: 250,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_,__,___) => const SizedBox(height: 250, child: Center(child: Text("QR Code not found"))),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text("Scan QR to pay", style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              SelectableText("UPI ID: yespay.rsbsdbconsumer1@yesbankltd", style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.w500)),
-              const SizedBox(height: 4),
-              Text("Bank: THE RADHASOAMI URBAN COOP BANK LTD.", style: TextStyle(color: Colors.grey[700], fontSize: 12), textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              const Text("After payment, the admin will verify and process your order.", textAlign: TextAlign.center,),
-              const SizedBox(height: 20),
-              FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text("Done"))
-            ],
-          ),
-        ),
-      )
-    );
-  }
-
-  Widget _kv(String k, String v) => Row(
-        children: [
-          Text(
-            '$k: ',
-            style: TextStyle(fontWeight: FontWeight.w700, color: kTextPrimary),
-          ),
-          Flexible(
-            child: Text(v, style: TextStyle(color: kTextPrimary)),
-          ),
-        ],
-      );
 }

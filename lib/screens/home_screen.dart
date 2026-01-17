@@ -84,7 +84,8 @@ import '../widgets/home_content.dart';
 import 'menu_drawer.dart';
 import 'login_screen.dart';
 import 'my_orders_page.dart'; // <-- added
-import '../theme/palette.dart'; // <-- palette import
+import '../theme/palette.dart';
+import '../main.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -108,22 +109,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    await prefs.remove('phone');
-
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    await MyApp.logout(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const MenuDrawer(),
+      drawer: MenuDrawer(onNavigate: _onItemTapped),
       body: SafeArea(child: _pages[_selectedIndex]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,

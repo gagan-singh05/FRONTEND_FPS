@@ -19,7 +19,7 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // 2) Initialize your runtime palette (do not remove)
-  await PaletteManager.initRandom();
+  await PaletteManager.init();
 
   // 3) Init push (FCM + local notifications)
   await PushService.init();
@@ -57,81 +57,86 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navServiceKey, // <- from PushService for notif navigation
-      title: 'Fair Price Shop',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: kPrimary, // <- palette color
-        scaffoldBackgroundColor: kBgBottom, // <- palette color
-        cardColor: kCard, // <- palette color
-        fontFamily: 'Serif',
-
-        appBarTheme: AppBarTheme(
-          backgroundColor: kBgTop, // <- palette color
-          foregroundColor: kTextPrimary, // <- palette color
-          elevation: 0,
-          iconTheme: IconThemeData(color: kTextPrimary),
-          titleTextStyle: TextStyle(
-            color: kTextPrimary,
+    return ValueListenableBuilder<AppPalette>(
+      valueListenable: PaletteManager.instance,
+      builder: (context, palette, _) {
+        return MaterialApp(
+          navigatorKey: navServiceKey, // <- from PushService for notif navigation
+          title: 'Fair Price Shop',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            colorSchemeSeed: kPrimary, // <- palette color
+            scaffoldBackgroundColor: kBgBottom, // <- palette color
+            cardColor: kCard, // <- palette color
             fontFamily: 'Serif',
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
+
+            appBarTheme: AppBarTheme(
+              backgroundColor: kBgTop, // <- palette color
+              foregroundColor: kTextPrimary, // <- palette color
+              elevation: 0,
+              iconTheme: IconThemeData(color: kTextPrimary),
+              titleTextStyle: TextStyle(
+                color: kTextPrimary,
+                fontFamily: 'Serif',
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+
+            bottomNavigationBarTheme: BottomNavigationBarThemeData(
+              backgroundColor: Colors.white,
+              selectedItemColor: kPrimary,
+              unselectedItemColor: kTextPrimary.withOpacity(0.6),
+              selectedLabelStyle: const TextStyle(fontFamily: 'Serif'),
+              unselectedLabelStyle: const TextStyle(fontFamily: 'Serif'),
+              showUnselectedLabels: true,
+              type: BottomNavigationBarType.fixed,
+            ),
+
+            floatingActionButtonTheme: FloatingActionButtonThemeData(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+            ),
+
+            progressIndicatorTheme: ProgressIndicatorThemeData(color: kPrimary),
+
+            snackBarTheme: SnackBarThemeData(
+              backgroundColor: kPrimary,
+              contentTextStyle: const TextStyle(color: Colors.white),
+              actionTextColor: Colors.white,
+              behavior: SnackBarBehavior.fixed,
+            ),
+
+            dividerTheme: DividerThemeData(color: kBorder),
+
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+            ),
           ),
-        ),
-
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          backgroundColor: Colors.white,
-          selectedItemColor: kPrimary,
-          unselectedItemColor: kTextPrimary.withOpacity(0.6),
-          selectedLabelStyle: const TextStyle(fontFamily: 'Serif'),
-          unselectedLabelStyle: const TextStyle(fontFamily: 'Serif'),
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-        ),
-
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: kPrimary,
-          foregroundColor: Colors.white,
-        ),
-
-        progressIndicatorTheme: ProgressIndicatorThemeData(color: kPrimary),
-
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: kPrimary,
-          contentTextStyle: const TextStyle(color: Colors.white),
-          actionTextColor: Colors.white,
-          behavior: SnackBarBehavior.floating,
-        ),
-
-        dividerTheme: DividerThemeData(color: kBorder),
-
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide.none,
+          home: FutureBuilder<bool>(
+            future: _isLoggedIn(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final loggedIn = snap.data == true;
+              return loggedIn ? const HomePage() : const LoginScreen();
+            },
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
-        ),
-      ),
-      home: FutureBuilder<bool>(
-        future: _isLoggedIn(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          final loggedIn = snap.data == true;
-          return loggedIn ? const HomePage() : const LoginScreen();
-        },
-      ),
+        );
+      },
     );
   }
 }

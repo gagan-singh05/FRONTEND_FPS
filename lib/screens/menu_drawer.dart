@@ -238,7 +238,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/palette.dart'; // ← palette import
+import '../theme/palette.dart'; 
+import '../main.dart'; // Import MyApp for logout
+import 'settings_page.dart'; // Import SettingsPage
 
 class MenuDrawer extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -252,7 +254,6 @@ class MenuDrawer extends StatefulWidget {
 class _MenuDrawerState extends State<MenuDrawer> {
   String name = '';
   String phone = '';
-  String? profilePath;
 
   @override
   void initState() {
@@ -265,30 +266,25 @@ class _MenuDrawerState extends State<MenuDrawer> {
     setState(() {
       name = prefs.getString('name') ?? 'Guest';
       phone = prefs.getString('phone') ?? '';
-      profilePath = prefs.getString('profilePhoto'); // Optional
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: kBgBottom, // ← palette
+      backgroundColor: kBgBottom,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           UserAccountsDrawerHeader(
-            decoration: BoxDecoration(color: kPrimary), // ← palette
-            accountName: const Text(
-              '',
-              // keep default style; name shown in Text below to control color
-            ),
+            decoration: BoxDecoration(color: kPrimary),
+            accountName: const Text(''),
             accountEmail: const Text(''),
             currentAccountPicture: CircleAvatar(
-              backgroundColor: kCard, // ← palette
+              backgroundColor: kCard,
               child: const Icon(Icons.person, color: Colors.white),
             ),
           ),
-          // Override the name/email with palette-colored text under the header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
@@ -308,73 +304,65 @@ class _MenuDrawerState extends State<MenuDrawer> {
             ),
           ),
           ListTile(
-            leading: Icon(Icons.person_outline, color: kPrimary), // ← palette
+            leading: Icon(Icons.person_outline, color: kPrimary),
             title: Text(
               'My Profile',
               style: TextStyle(color: kTextPrimary),
-            ), // ← palette
+            ),
             onTap: () {
               Navigator.pop(context);
-              widget.onNavigate?.call(3); // Navigate to profile tab
+              widget.onNavigate?.call(3); // Profile tab index
             },
           ),
           ListTile(
-            leading: Icon(Icons.list_alt, color: kPrimary), // ← palette
+            leading: Icon(Icons.list_alt, color: kPrimary),
             title: Text(
               'My Orders',
               style: TextStyle(color: kTextPrimary),
-            ), // ← palette
+            ),
             onTap: () {
               Navigator.pop(context);
-              // You can define separate logic or screen for orders
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.favorite_border, color: kPrimary), // ← palette
-            title: Text(
-              'Favorites',
-              style: TextStyle(color: kTextPrimary),
-            ), // ← palette
-            onTap: () {
-              Navigator.pop(context);
-              widget.onNavigate?.call(1); // Navigate to favorites tab
+              widget.onNavigate?.call(1); // My Orders tab index
             },
           ),
           ListTile(
             leading: Icon(
               Icons.shopping_cart_outlined,
               color: kPrimary,
-            ), // ← palette
+            ),
             title: Text(
               'Cart',
               style: TextStyle(color: kTextPrimary),
-            ), // ← palette
+            ),
             onTap: () {
               Navigator.pop(context);
-              widget.onNavigate?.call(2); // Navigate to cart tab
+              widget.onNavigate?.call(2); // Cart tab index
             },
           ),
-          Divider(color: kBorder), // ← palette
+          const Divider(),
           ListTile(
-            leading: Icon(Icons.settings, color: kPrimary), // ← palette
+            leading: Icon(Icons.settings_outlined, color: kPrimary),
             title: Text(
               'Settings',
               style: TextStyle(color: kTextPrimary),
-            ), // ← palette
+            ),
             onTap: () {
               Navigator.pop(context);
-              // Navigate to settings page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
             },
           ),
           ListTile(
-            leading: Icon(Icons.logout, color: kPrimary), // ← palette
+            leading: Icon(Icons.logout, color: kPrimary),
             title: Text(
               'Logout',
               style: TextStyle(color: kTextPrimary),
-            ), // ← palette
-            onTap: () {
+            ),
+            onTap: () async {
               Navigator.pop(context);
-              // Implement logout logic
+              await MyApp.logout(context);
             },
           ),
         ],

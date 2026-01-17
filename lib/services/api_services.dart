@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/config.dart';
 import '../models/product.dart';
@@ -25,6 +26,16 @@ class ApiService {
   static Map<String, String> get _jsonHeaders => {
     HttpHeaders.contentTypeHeader: 'application/json',
   };
+
+  static Future<Map<String, String>> _authHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    return {
+      ..._jsonHeaders,
+      if (token != null && token.isNotEmpty)
+        HttpHeaders.authorizationHeader: 'Token $token',
+    };
+  }
 
   // ---- Generic response handler ----
   static T _decodeJson<T>(String body) {
@@ -139,5 +150,92 @@ class ApiService {
     _throwForNon200(res);
   }
 
+  /// POST /users/password-reset/
+  static Future<Map<String, dynamic>> resetPassword({
+    required String phone,
+    required String newPassword,
+  }) async {
+    final res = await _client
+        .post(
+          _u('/users/password-reset/'),
+          headers: _jsonHeaders,
+          body: jsonEncode({'phone': phone, 'new_password': newPassword}),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 200) {
+      return _decodeJson<Map<String, dynamic>>(res.body);
+    }
+    _throwForNon200(res);
+  }
+
   /// If you add more endpoints later, keep adding here…
+
+  // ===================== ORDERS =====================
+
+  /// POST /me/orders/{id}/add-item/
+  static Future<Map<String, dynamic>> addItemToOrder(
+      int orderId, int productId, int quantity) async {
+    final res = await _client
+        .post(
+          _u('/me/orders/$orderId/add-item/'),
+          headers: await _authHeaders(),
+          body: jsonEncode({'product_id': productId, 'quantity': quantity}),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 200) {
+      return _decodeJson<Map<String, dynamic>>(res.body);
+    }
+    _throwForNon200(res);
+  }
+
+  /// POST /me/orders/{id}/remove-item/
+  static Future<Map<String, dynamic>> removeItemFromOrder(
+      int orderId, int itemId) async {
+    final res = await _client
+        .post(
+          _u('/me/orders/$orderId/remove-item/'),
+          headers: await _authHeaders(),
+          body: jsonEncode({'item_id': itemId}),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 200) {
+      return _decodeJson<Map<String, dynamic>>(res.body);
+    }
+    _throwForNon200(res);
+  }
+
+  /// POST /me/orders/{id}/update-item-quantity/
+  static Future<Map<String, dynamic>> updateOrderQuantity(
+      int orderId, int itemId, int quantity) async {
+    final res = await _client
+        .post(
+          _u('/me/orders/$orderId/update-item-quantity/'),
+          headers: await _authHeaders(),
+          body: jsonEncode({'item_id': itemId, 'quantity': quantity}),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 200) {
+      return _decodeJson<Map<String, dynamic>>(res.body);
+    }
+    _throwForNon200(res);
+  }
+
+  /// POST /me/orders/{id}/cancel/
+  static Future<Map<String, dynamic>> cancelOrder(int orderId) async {
+    final res = await _client
+        .post(
+          _u('/me/orders/$orderId/cancel/'),
+          headers: await _authHeaders(),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 200) {
+      return _decodeJson<Map<String, dynamic>>(res.body);
+    }
+    _throwForNon200(res);
+  }
 }
